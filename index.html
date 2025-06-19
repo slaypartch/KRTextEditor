@@ -89,66 +89,26 @@
         </div>
       </div>
       <div class="control-group">
-        <button id="save-btn">저장</button>
-        <button id="load-btn">불러오기</button>
         <input type="file" id="file-input" accept=".txt">
-        <button id="save-as-btn">새 이름으로 저장</button>
+        <button id="load-btn">파일 열기</button>
+        <button id="save-as-btn">텍스트 다운로드</button>
       </div>
       <div class="char-count-container">
         <p id="char-count-inc-space">공백포함: 0자</p>
         <p id="char-count-exc-space">공백미포함: 0자</p>
       </div>
     </div>
-    <div class="recent-files-panel">
-      <label>최근 파일</label>
-      <ul id="recent-files-list"></ul>
-    </div>
   </div>
 </div>
 <script>
-  let fileHandle = null;
-  let lastSavedText = '';
-
-  async function openDB() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open("FileHandlesDB", 1);
-      request.onupgradeneeded = event => {
-        const db = event.target.result;
-        db.createObjectStore("handles", { keyPath: "name" });
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async function saveFileHandle(name, handle) {
-    const db = await openDB();
-    const tx = db.transaction("handles", "readwrite");
-    tx.objectStore("handles").put({ name, handle });
-    return tx.complete;
-  }
-
-  async function getAllFileHandles() {
-    const db = await openDB();
-    const tx = db.transaction("handles", "readonly");
-    return tx.objectStore("handles").getAll();
-  }
-
-  async function deleteFileHandle(name) {
-    const db = await openDB();
-    const tx = db.transaction("handles", "readwrite");
-    tx.objectStore("handles").delete(name);
-    return tx.complete;
-  }
-
   document.addEventListener('DOMContentLoaded', () => {
     const textEditor = document.getElementById('text-editor');
     const editorWrapper = document.getElementById('editor-wrapper');
     const fontSelect = document.getElementById('font-select');
     const fontSizeInput = document.getElementById('font-size-input');
-    const saveBtn = document.getElementById('save-btn');
-    const saveAsBtn = document.getElementById('save-as-btn');
     const loadBtn = document.getElementById('load-btn');
+    const saveAsBtn = document.getElementById('save-as-btn');
+    const fileInput = document.getElementById('file-input');
     const charCountIncSpace = document.getElementById('char-count-inc-space');
     const charCountExcSpace = document.getElementById('char-count-exc-space');
 
@@ -165,104 +125,11 @@
       return lines.join('\n');
     }
 
-    function markSaved(text) {
-      lastSavedText = text;
-      saveBtn.style.backgroundColor = 'green';
-      saveBtn.style.color = 'white';
-      saveBtn.textContent = '저장 (저장됨)';
-    }
-
-    function checkForChanges() {
-      const currentText = getEditorText();
-      if (currentText !== lastSavedText) {
-        saveBtn.style.backgroundColor = 'crimson';
-        saveBtn.style.color = 'white';
-        saveBtn.textContent = '저장 (변경됨)';
-      } else {
-        markSaved(currentText);
-      }
-    }
-
-    async function writeToFile() {
-      const text = getEditorText();
-      const blob = new Blob([text], { type: 'text/plain' });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      markSaved(text);
-      await saveFileHandle(fileHandle.name || 'Unnamed', fileHandle);
-      renderRecentFileHandles();
-    }
-
-    saveBtn.addEventListener('click', async () => {
-      if (fileHandle) await writeToFile();
-      else saveAsBtn.click();
-    });
-
-    saveAsBtn.addEventListener('click', async () => {
-      try {
-        fileHandle = await window.showSaveFilePicker({
-          types: [{ description: 'Text Files', accept: { 'text/plain': ['.txt'] } }]
-        });
-        await writeToFile();
-      } catch (err) { console.error(err); }
-    });
-
-    loadBtn.addEventListener('click', async () => {
-      try {
-        [fileHandle] = await window.showOpenFilePicker({
-          types: [{ accept: { 'text/plain': ['.txt'] } }]
-        });
-        const file = await fileHandle.getFile();
-        const text = await file.text();
-        loadTextToEditor(text);
-        await saveFileHandle(file.name, fileHandle);
-        renderRecentFileHandles();
-      } catch (err) {
-        console.error('불러오기 실패:', err);
-      }
-    });
-
     function loadTextToEditor(text) {
       const lines = text.split('\n');
       const html = lines.map(line => line.trim() === '' ? '<div><br></div>' : `<div>${line}</div>`).join('');
       textEditor.innerHTML = html;
       updateCharCount();
-      markSaved(getEditorText());
-    }
-
-    async function renderRecentFileHandles() {
-      const list = document.getElementById('recent-files-list');
-      list.innerHTML = '';
-      const files = await getAllFileHandles();
-      files.forEach(entry => {
-        const li = document.createElement('li');
-        const span = document.createElement('span');
-        span.textContent = entry.name;
-        span.style.flexGrow = '1';
-        span.style.cursor = 'pointer';
-        span.addEventListener('click', async () => {
-          try {
-            const file = await entry.handle.getFile();
-            const text = await file.text();
-            fileHandle = entry.handle;
-            loadTextToEditor(text);
-          } catch (e) {
-            alert('파일 접근이 거부되었거나 존재하지 않습니다.');
-            console.error(e);
-          }
-        });
-        const del = document.createElement('button');
-        del.textContent = '✕';
-        del.onclick = async (e) => {
-          e.stopPropagation();
-          await deleteFileHandle(entry.name);
-          renderRecentFileHandles();
-        };
-        li.appendChild(span);
-        li.appendChild(del);
-        list.appendChild(li);
-      });
     }
 
     fontSelect.addEventListener('change', e => {
@@ -282,22 +149,50 @@
     });
     resizeObserver.observe(editorWrapper);
 
-    textEditor.addEventListener('input', () => {
-      updateCharCount();
-      checkForChanges();
+    textEditor.addEventListener('input', updateCharCount);
+
+    loadBtn.addEventListener('click', () => {
+      fileInput.click();
     });
 
-    document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        saveBtn.click();
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const text = await file.text();
+        loadTextToEditor(text);
       }
     });
 
+    saveAsBtn.addEventListener('click', () => {
+      const blob = new Blob([getEditorText()], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '문서.txt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
     // 초기화
+    const savedFont = localStorage.getItem('editorFontFamily');
+    if (savedFont) {
+      textEditor.style.fontFamily = savedFont;
+      fontSelect.value = savedFont;
+    }
+    const savedFontSize = localStorage.getItem('editorFontSize');
+    if (savedFontSize) {
+      textEditor.style.fontSize = `${savedFontSize}px`;
+      fontSizeInput.value = savedFontSize;
+    }
+    const savedWidth = localStorage.getItem('editorWidth');
+    const savedHeight = localStorage.getItem('editorHeight');
+    if (savedWidth) editorWrapper.style.width = savedWidth;
+    if (savedHeight) editorWrapper.style.height = savedHeight;
+
     textEditor.innerHTML = '<div><br></div>';
     updateCharCount();
-    renderRecentFileHandles();
   });
 </script>
 </body>
