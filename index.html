@@ -1,72 +1,145 @@
-<script>
-  const idbHelper = {
-    db: null,
-    dbName: 'file-editor-db',
-    storeName: 'fileHandles',
-    async openDB() {
-      return new Promise((resolve, reject) => {
-        if (this.db) return resolve(this.db);
-        const request = indexedDB.open(this.dbName, 1);
-        request.onerror = (event) => reject(event.target.error);
-        request.onsuccess = (event) => {
-          this.db = event.target.result;
-          resolve(this.db);
-        };
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-          if (!db.objectStoreNames.contains(this.storeName)) {
-            db.createObjectStore(this.storeName, { keyPath: 'name' });
-          }
-        };
-      });
-    },
-    async put(fileHandle) {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([this.storeName], 'readwrite');
-        const store = transaction.objectStore(this.storeName);
-        const request = store.put({ name: fileHandle.name, handle: fileHandle, timestamp: Date.now() });
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event.target.error);
-      });
-    },
-    async get(name) {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([this.storeName], 'readonly');
-        const store = transaction.objectStore(this.storeName);
-        const request = store.get(name);
-        request.onsuccess = () => resolve(request.result?.handle);
-        request.onerror = (event) => reject(event.target.error);
-      });
-    },
-    async delete(name) {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([this.storeName], 'readwrite');
-        const store = transaction.objectStore(this.storeName);
-        const request = store.delete(name);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event.target.error);
-      });
-    },
-    async getAll() {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([this.storeName], 'readonly');
-        const store = transaction.objectStore(this.storeName);
-        const request = store.getAll();
-        request.onsuccess = () => {
-            const sorted = request.result.sort((a, b) => b.timestamp - a.timestamp);
-            resolve(sorted);
-        }
-        request.onerror = (event) => reject(event.target.error);
-      });
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>문서 작성기</title>
+  <style>
+    body {
+      font-family: 'Malgun Gothic', sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
     }
-  };
-
+    .main-container { display: flex; gap: 30px; width: 100%; max-width: 1200px; }
+    .editor-container {
+      display: flex; width: 700px; height: 85vh; min-width: 200px;
+      min-height: 200px; resize: both; overflow: auto;
+      border: 1px solid #ccc; background-color: white; border-radius: 4px;
+    }
+    #text-editor {
+      width: 100%; height: 100%; padding: 15px;
+      font-size: 15px; line-height: 1.6; box-sizing: border-box; outline: none;
+    }
+    #text-editor > * { text-indent: 1em; margin: 0; padding: 0; }
+    .right-panel {
+      width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 20px;
+    }
+    .controls-container, .recent-files-panel {
+      padding: 20px; border: 1px solid #ddd;
+      background-color: #ffffff; border-radius: 5px;
+    }
+    .control-group { margin-bottom: 25px; }
+    .control-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+    .control-group .inline-controls { display: flex; gap: 10px; }
+    .control-group select, .control-group input[type="number"] {
+      width: 100%; padding: 8px; border: 1px solid #ccc;
+      border-radius: 3px; box-sizing: border-box;
+    }
+    .control-group button {
+      width: 100%; padding: 10px; border: 1px solid #ccc;
+      background-color: #f0f0f0; cursor: pointer; font-weight: bold;
+      border-radius: 3px; margin-bottom: 10px; transition: background-color 0.2s;
+    }
+    .control-group button:hover { background-color: #e0e0e0; }
+    #file-input { display: none; }
+    .char-count-container {
+      padding: 15px; border: 1px solid red;
+      border-radius: 3px; font-size: 0.9em;
+    }
+    .char-count-container p { margin: 5px 0; }
+    .recent-files-panel label { font-weight: bold; margin-bottom: 10px; display: block; }
+    #recent-files-list {
+      list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;
+    }
+    #recent-files-list li {
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; padding: 6px 4px; border-bottom: 1px solid #eee;
+      transition: background-color 0.2s;
+    }
+    #recent-files-list li:hover { background-color: #f5f5f5; }
+    #recent-files-list li button {
+      margin-left: 10px; border: none; background: transparent;
+      color: #999; font-size: 0.9em; cursor: pointer;
+    }
+    #recent-files-list li button:hover { color: crimson; }
+  </style>
+</head>
+<body>
+<div class="main-container">
+  <div class="editor-container" id="editor-wrapper">
+    <div id="text-editor" contenteditable="true" spellcheck="false"></div>
+  </div>
+  <div class="right-panel">
+    <div class="controls-container">
+      <div class="control-group">
+        <label>폰트 설정</label>
+        <div class="inline-controls">
+          <select id="font-select">
+            <option value="Sans">Sans</option>
+            <option value="Serif">Serif</option>
+            <option value="Monospace">Monospace</option>
+            <option value="Malgun Gothic">맑은 고딕</option>
+            <option value="Gulim">굴림</option>
+            <option value="Dotum">돋움</option>
+          </select>
+          <input type="number" id="font-size-input" value="15" min="1">
+        </div>
+      </div>
+      <div class="control-group">
+        <button id="save-btn">저장</button>
+        <button id="load-btn">불러오기</button>
+        <input type="file" id="file-input" accept=".txt">
+        <button id="save-as-btn">새 이름으로 저장</button>
+      </div>
+      <div class="char-count-container">
+        <p id="char-count-inc-space">공백포함: 0자</p>
+        <p id="char-count-exc-space">공백미포함: 0자</p>
+      </div>
+    </div>
+    <div class="recent-files-panel">
+      <label>최근 파일</label>
+      <ul id="recent-files-list"></ul>
+    </div>
+  </div>
+</div>
+<script>
   let fileHandle = null;
   let lastSavedText = '';
+
+  async function openDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open("FileHandlesDB", 1);
+      request.onupgradeneeded = event => {
+        const db = event.target.result;
+        db.createObjectStore("handles", { keyPath: "name" });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function saveFileHandle(name, handle) {
+    const db = await openDB();
+    const tx = db.transaction("handles", "readwrite");
+    tx.objectStore("handles").put({ name, handle });
+    return tx.complete;
+  }
+
+  async function getAllFileHandles() {
+    const db = await openDB();
+    const tx = db.transaction("handles", "readonly");
+    return tx.objectStore("handles").getAll();
+  }
+
+  async function deleteFileHandle(name) {
+    const db = await openDB();
+    const tx = db.transaction("handles", "readwrite");
+    tx.objectStore("handles").delete(name);
+    return tx.complete;
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     const textEditor = document.getElementById('text-editor');
@@ -79,17 +152,6 @@
     const charCountIncSpace = document.getElementById('char-count-inc-space');
     const charCountExcSpace = document.getElementById('char-count-exc-space');
 
-    function loadSettings() {
-      const savedFont = localStorage.getItem('editorFontFamily');
-      if (savedFont) { textEditor.style.fontFamily = savedFont; fontSelect.value = savedFont; }
-      const savedFontSize = localStorage.getItem('editorFontSize');
-      if (savedFontSize) { textEditor.style.fontSize = `${savedFontSize}px`; fontSizeInput.value = savedFontSize; }
-      const savedWidth = localStorage.getItem('editorWidth');
-      const savedHeight = localStorage.getItem('editorHeight');
-      if (savedWidth) editorWrapper.style.width = savedWidth;
-      if (savedHeight) editorWrapper.style.height = savedHeight;
-    }
-
     function updateCharCount() {
       const text = textEditor.innerText;
       const countWithSpaces = text.replace(/\n/g, '').length;
@@ -99,7 +161,8 @@
     }
 
     function getEditorText() {
-      return Array.from(textEditor.children).map(child => child.innerText.replace(/\r?\n/g, '')).join('\n');
+      const lines = Array.from(textEditor.children).map(child => child.innerText.replace(/\r?\n/g, ''));
+      return lines.join('\n');
     }
 
     function markSaved(text) {
@@ -120,67 +183,45 @@
       }
     }
 
-    async function writeToFile(handle) {
+    async function writeToFile() {
       const text = getEditorText();
       const blob = new Blob([text], { type: 'text/plain' });
-      const writable = await handle.createWritable();
+      const writable = await fileHandle.createWritable();
       await writable.write(blob);
       await writable.close();
       markSaved(text);
-      try {
-        await idbHelper.put(handle);
-        await renderRecentFiles();
-      } catch (err) {
-        console.warn("최근 파일 목록 저장에 실패했습니다:", err);
-      }
+      await saveFileHandle(fileHandle.name || 'Unnamed', fileHandle);
+      renderRecentFileHandles();
     }
 
     saveBtn.addEventListener('click', async () => {
-      if (fileHandle) { await writeToFile(fileHandle); } else { saveAsBtn.click(); }
+      if (fileHandle) await writeToFile();
+      else saveAsBtn.click();
     });
 
     saveAsBtn.addEventListener('click', async () => {
       try {
-        const newFileHandle = await window.showSaveFilePicker({ types: [{ description: 'Text Files', accept: { 'text/plain': ['.txt'] } }] });
-        fileHandle = newFileHandle;
-        await writeToFile(fileHandle);
+        fileHandle = await window.showSaveFilePicker({
+          types: [{ description: 'Text Files', accept: { 'text/plain': ['.txt'] } }]
+        });
+        await writeToFile();
       } catch (err) { console.error(err); }
     });
 
     loadBtn.addEventListener('click', async () => {
       try {
-        [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'text/plain': ['.txt'] } }] });
-        await loadFileFromHandle(fileHandle);
-      } catch (err) { console.error('파일 불러오기 실패:', err); }
+        [fileHandle] = await window.showOpenFilePicker({
+          types: [{ accept: { 'text/plain': ['.txt'] } }]
+        });
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        loadTextToEditor(text);
+        await saveFileHandle(file.name, fileHandle);
+        renderRecentFileHandles();
+      } catch (err) {
+        console.error('불러오기 실패:', err);
+      }
     });
-
-    async function loadFileFromHandle(handle) {
-        try {
-            if ((await handle.queryPermission({ mode: 'read' })) !== 'granted') {
-                if ((await handle.requestPermission({ mode: 'read' })) !== 'granted') {
-                    throw new Error('파일 읽기 권한이 거부되었습니다.');
-                }
-            }
-            const file = await handle.getFile();
-            const text = await file.text();
-            loadTextToEditor(text);
-            fileHandle = handle;
-            await idbHelper.put(handle);
-            await renderRecentFiles();
-        } catch (err) {
-            console.warn("파일을 불러왔지만 최근 파일 목록 갱신에 실패했습니다:", err);
-            // 에러가 나더라도 파일 내용은 표시되도록 재시도
-            try {
-                const file = await handle.getFile();
-                const text = await file.text();
-                loadTextToEditor(text);
-                fileHandle = handle;
-            } catch (readErr) {
-                console.error("파일 읽기 자체에 실패했습니다:", readErr);
-                alert("파일을 읽을 수 없습니다.");
-            }
-        }
-    }
 
     function loadTextToEditor(text) {
       const lines = text.split('\n');
@@ -190,52 +231,74 @@
       markSaved(getEditorText());
     }
 
-    fontSelect.addEventListener('change', (e) => { textEditor.style.fontFamily = e.target.value; localStorage.setItem('editorFontFamily', e.target.value); });
-    fontSizeInput.addEventListener('input', (e) => { if (e.target.value > 0) { textEditor.style.fontSize = `${e.target.value}px`; localStorage.setItem('editorFontSize', e.target.value); } });
-    const resizeObserver = new ResizeObserver(() => { localStorage.setItem('editorWidth', editorWrapper.style.width); localStorage.setItem('editorHeight', editorWrapper.style.height); });
-    resizeObserver.observe(editorWrapper);
-    textEditor.addEventListener('input', () => { updateCharCount(); checkForChanges(); });
-    document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveBtn.click(); } });
-
-    async function renderRecentFiles() {
-        const list = document.getElementById('recent-files-list');
-        try {
-            const recentFiles = (await idbHelper.getAll()).slice(0, 10);
-            list.innerHTML = '';
-            if (recentFiles.length === 0) {
-                list.innerHTML = '<li>최근 파일 없음</li>';
-                return;
-            }
-            recentFiles.forEach(fileInfo => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = fileInfo.name;
-                li.addEventListener('click', async () => {
-                    const handleToLoad = await idbHelper.get(fileInfo.name);
-                    if (handleToLoad) { await loadFileFromHandle(handleToLoad); }
-                    else { alert('파일을 찾을 수 없습니다.'); await idbHelper.delete(fileInfo.name); await renderRecentFiles(); }
-                });
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '✕';
-                deleteBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    await idbHelper.delete(fileInfo.name);
-                    await renderRecentFiles();
-                });
-                li.appendChild(span);
-                li.appendChild(deleteBtn);
-                list.appendChild(li);
-            });
-        } catch (err) {
-            console.warn("최근 파일 목록을 불러올 수 없습니다 (보안 정책).", err);
-            list.innerHTML = '<li>(기능 사용 불가)</li>';
-        }
+    async function renderRecentFileHandles() {
+      const list = document.getElementById('recent-files-list');
+      list.innerHTML = '';
+      const files = await getAllFileHandles();
+      files.forEach(entry => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = entry.name;
+        span.style.flexGrow = '1';
+        span.style.cursor = 'pointer';
+        span.addEventListener('click', async () => {
+          try {
+            const file = await entry.handle.getFile();
+            const text = await file.text();
+            fileHandle = entry.handle;
+            loadTextToEditor(text);
+          } catch (e) {
+            alert('파일 접근이 거부되었거나 존재하지 않습니다.');
+            console.error(e);
+          }
+        });
+        const del = document.createElement('button');
+        del.textContent = '✕';
+        del.onclick = async (e) => {
+          e.stopPropagation();
+          await deleteFileHandle(entry.name);
+          renderRecentFileHandles();
+        };
+        li.appendChild(span);
+        li.appendChild(del);
+        list.appendChild(li);
+      });
     }
 
+    fontSelect.addEventListener('change', e => {
+      textEditor.style.fontFamily = e.target.value;
+      localStorage.setItem('editorFontFamily', e.target.value);
+    });
+
+    fontSizeInput.addEventListener('input', e => {
+      textEditor.style.fontSize = `${e.target.value}px`;
+      localStorage.setItem('editorFontSize', e.target.value);
+    });
+
+    const resizeObserver = new ResizeObserver(() => {
+      const styles = window.getComputedStyle(editorWrapper);
+      localStorage.setItem('editorWidth', styles.width);
+      localStorage.setItem('editorHeight', styles.height);
+    });
+    resizeObserver.observe(editorWrapper);
+
+    textEditor.addEventListener('input', () => {
+      updateCharCount();
+      checkForChanges();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveBtn.click();
+      }
+    });
+
     // 초기화
-    loadSettings();
-    renderRecentFiles();
     textEditor.innerHTML = '<div><br></div>';
     updateCharCount();
+    renderRecentFileHandles();
   });
 </script>
+</body>
+</html>
