@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>문서 작성기</title>
+  <title>문서 작성</title>
   <style>
     body {
       font-family: 'Malgun Gothic', sans-serif;
@@ -13,58 +13,113 @@
       display: flex;
       justify-content: center;
     }
-    .main-container { display: flex; gap: 30px; width: 100%; max-width: 1200px; }
+
+    .main-container {
+      display: flex;
+      gap: 30px;
+      width: 100%;
+      max-width: 1200px;
+    }
+
     .editor-container {
-      display: flex; width: 700px; height: 85vh; min-width: 200px;
-      min-height: 200px; resize: both; overflow: auto;
-      border: 1px solid #ccc; background-color: white; border-radius: 4px;
+      display: flex;
+      width: 700px;
+      height: 85vh;
+      min-width: 200px;
+      min-height: 200px;
+      resize: both;
+      overflow: auto;
+      border: 1px solid #ccc;
+      background-color: white;
+      border-radius: 4px;
     }
+
     #text-editor {
-      width: 100%; height: 100%; padding: 15px;
-      font-size: 15px; line-height: 1.6; box-sizing: border-box; outline: none;
+      width: 100%;
+      height: 100%;
+      padding: 15px;
+      font-size: 15px;
+      line-height: 1.6;
+      box-sizing: border-box;
+      outline: none;
     }
-    #text-editor > * { text-indent: 1em; margin: 0; padding: 0; }
+
+    #text-editor > * {
+      text-indent: 1em;
+      margin: 0;
+      padding: 0;
+    }
+
     .right-panel {
-      width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 20px;
+      width: 250px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
-    .controls-container, .recent-files-panel {
-      padding: 20px; border: 1px solid #ddd;
-      background-color: #ffffff; border-radius: 5px;
+
+    .controls-container {
+      padding: 20px;
+      border: 1px solid #ddd;
+      background-color: #ffffff;
+      border-radius: 5px;
     }
-    .control-group { margin-bottom: 25px; }
-    .control-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
-    .control-group .inline-controls { display: flex; gap: 10px; }
-    .control-group select, .control-group input[type="number"] {
-      width: 100%; padding: 8px; border: 1px solid #ccc;
-      border-radius: 3px; box-sizing: border-box;
+
+    .control-group {
+      margin-bottom: 25px;
     }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 0.9em;
+    }
+
+    .control-group .inline-controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .control-group select,
+    .control-group input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      box-sizing: border-box;
+    }
+
     .control-group button {
-      width: 100%; padding: 10px; border: 1px solid #ccc;
-      background-color: #f0f0f0; cursor: pointer; font-weight: bold;
-      border-radius: 3px; margin-bottom: 10px; transition: background-color 0.2s;
-    }
-    .control-group button:hover { background-color: #e0e0e0; }
-    #file-input { display: none; }
-    .char-count-container {
-      padding: 15px; border: 1px solid red;
-      border-radius: 3px; font-size: 0.9em;
-    }
-    .char-count-container p { margin: 5px 0; }
-    .recent-files-panel label { font-weight: bold; margin-bottom: 10px; display: block; }
-    #recent-files-list {
-      list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;
-    }
-    #recent-files-list li {
-      display: flex; justify-content: space-between; align-items: center;
-      cursor: pointer; padding: 6px 4px; border-bottom: 1px solid #eee;
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background-color: #f0f0f0;
+      cursor: pointer;
+      font-weight: bold;
+      border-radius: 3px;
+      margin-bottom: 10px;
       transition: background-color 0.2s;
     }
-    #recent-files-list li:hover { background-color: #f5f5f5; }
-    #recent-files-list li button {
-      margin-left: 10px; border: none; background: transparent;
-      color: #999; font-size: 0.9em; cursor: pointer;
+
+    .control-group button:hover {
+      background-color: #e0e0e0;
     }
-    #recent-files-list li button:hover { color: crimson; }
+
+    #file-input {
+      display: none;
+    }
+
+    .char-count-container {
+      padding: 15px;
+      border: 1px solid red;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+
+    .char-count-container p {
+      margin: 5px 0;
+    }
   </style>
 </head>
 <body>
@@ -72,6 +127,7 @@
   <div class="editor-container" id="editor-wrapper">
     <div id="text-editor" contenteditable="true" spellcheck="false"></div>
   </div>
+
   <div class="right-panel">
     <div class="controls-container">
       <div class="control-group">
@@ -89,9 +145,10 @@
         </div>
       </div>
       <div class="control-group">
+        <button id="save-btn">저장</button>
+        <button id="load-btn">불러오기</button>
         <input type="file" id="file-input" accept=".txt">
-        <button id="load-btn">파일 열기</button>
-        <button id="save-as-btn">텍스트 다운로드</button>
+        <button id="save-as-btn">새 이름으로 저장</button>
       </div>
       <div class="char-count-container">
         <p id="char-count-inc-space">공백포함: 0자</p>
@@ -100,17 +157,40 @@
     </div>
   </div>
 </div>
+
 <script>
+  let fileHandle = null;
+  let lastSavedText = '';
+
   document.addEventListener('DOMContentLoaded', () => {
     const textEditor = document.getElementById('text-editor');
     const editorWrapper = document.getElementById('editor-wrapper');
     const fontSelect = document.getElementById('font-select');
     const fontSizeInput = document.getElementById('font-size-input');
-    const loadBtn = document.getElementById('load-btn');
+    const saveBtn = document.getElementById('save-btn');
     const saveAsBtn = document.getElementById('save-as-btn');
-    const fileInput = document.getElementById('file-input');
+    const loadBtn = document.getElementById('load-btn');
     const charCountIncSpace = document.getElementById('char-count-inc-space');
     const charCountExcSpace = document.getElementById('char-count-exc-space');
+
+    function loadSettings() {
+      const savedFont = localStorage.getItem('editorFontFamily');
+      if (savedFont) {
+        textEditor.style.fontFamily = savedFont;
+        fontSelect.value = savedFont;
+      }
+
+      const savedFontSize = localStorage.getItem('editorFontSize');
+      if (savedFontSize) {
+        textEditor.style.fontSize = `${savedFontSize}px`;
+        fontSizeInput.value = savedFontSize;
+      }
+
+      const savedWidth = localStorage.getItem('editorWidth');
+      const savedHeight = localStorage.getItem('editorHeight');
+      if (savedWidth) editorWrapper.style.width = savedWidth;
+      if (savedHeight) editorWrapper.style.height = savedHeight;
+    }
 
     function updateCharCount() {
       const text = textEditor.innerText;
@@ -121,25 +201,90 @@
     }
 
     function getEditorText() {
-      const lines = Array.from(textEditor.children).map(child => child.innerText.replace(/\r?\n/g, ''));
+      const lines = Array.from(textEditor.children).map(child => {
+        const text = child.innerText.replace(/\r?\n/g, '');
+        return text === '' ? '' : text;
+      });
       return lines.join('\n');
     }
+
+    function markSaved(text) {
+      lastSavedText = text;
+      saveBtn.style.backgroundColor = 'green';
+      saveBtn.style.color = 'white';
+      saveBtn.textContent = '저장 (저장됨)';
+    }
+
+    function checkForChanges() {
+      const currentText = getEditorText();
+      if (currentText !== lastSavedText) {
+        saveBtn.style.backgroundColor = 'crimson';
+        saveBtn.style.color = 'white';
+        saveBtn.textContent = '저장 (변경됨)';
+      } else {
+        markSaved(currentText);
+      }
+    }
+
+    async function writeToFile() {
+      const text = getEditorText();
+      const blob = new Blob([text], { type: 'text/plain' });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      markSaved(text);
+    }
+
+    saveBtn.addEventListener('click', async () => {
+      if (fileHandle) {
+        await writeToFile();
+      } else {
+        saveAsBtn.click();
+      }
+    });
+
+    saveAsBtn.addEventListener('click', async () => {
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          types: [{ description: 'Text Files', accept: { 'text/plain': ['.txt'] } }]
+        });
+        await writeToFile();
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    loadBtn.addEventListener('click', async () => {
+      try {
+        [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'text/plain': ['.txt'] } }] });
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        loadTextToEditor(text);
+      } catch (err) {
+        console.error('파일 불러오기 실패:', err);
+      }
+    });
 
     function loadTextToEditor(text) {
       const lines = text.split('\n');
       const html = lines.map(line => line.trim() === '' ? '<div><br></div>' : `<div>${line}</div>`).join('');
       textEditor.innerHTML = html;
       updateCharCount();
+      markSaved(getEditorText());
     }
 
-    fontSelect.addEventListener('change', e => {
-      textEditor.style.fontFamily = e.target.value;
-      localStorage.setItem('editorFontFamily', e.target.value);
+    fontSelect.addEventListener('change', (e) => {
+      const newFont = e.target.value;
+      textEditor.style.fontFamily = newFont;
+      localStorage.setItem('editorFontFamily', newFont);
     });
 
-    fontSizeInput.addEventListener('input', e => {
-      textEditor.style.fontSize = `${e.target.value}px`;
-      localStorage.setItem('editorFontSize', e.target.value);
+    fontSizeInput.addEventListener('input', (e) => {
+      const size = e.target.value;
+      if (size > 0) {
+        textEditor.style.fontSize = `${size}px`;
+        localStorage.setItem('editorFontSize', size);
+      }
     });
 
     const resizeObserver = new ResizeObserver(() => {
@@ -149,48 +294,19 @@
     });
     resizeObserver.observe(editorWrapper);
 
-    textEditor.addEventListener('input', updateCharCount);
-
-    loadBtn.addEventListener('click', () => {
-      fileInput.click();
+    textEditor.addEventListener('input', () => {
+      updateCharCount();
+      checkForChanges();
     });
 
-    fileInput.addEventListener('change', async (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const text = await file.text();
-        loadTextToEditor(text);
+    document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        saveBtn.click();
       }
     });
 
-    saveAsBtn.addEventListener('click', () => {
-      const blob = new Blob([getEditorText()], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = '문서.txt';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    });
-
-    // 초기화
-    const savedFont = localStorage.getItem('editorFontFamily');
-    if (savedFont) {
-      textEditor.style.fontFamily = savedFont;
-      fontSelect.value = savedFont;
-    }
-    const savedFontSize = localStorage.getItem('editorFontSize');
-    if (savedFontSize) {
-      textEditor.style.fontSize = `${savedFontSize}px`;
-      fontSizeInput.value = savedFontSize;
-    }
-    const savedWidth = localStorage.getItem('editorWidth');
-    const savedHeight = localStorage.getItem('editorHeight');
-    if (savedWidth) editorWrapper.style.width = savedWidth;
-    if (savedHeight) editorWrapper.style.height = savedHeight;
-
+    loadSettings();
     textEditor.innerHTML = '<div><br></div>';
     updateCharCount();
   });
